@@ -33,7 +33,6 @@ defmodule Eidetic.Mixfile do
 
   def aliases do
     [ "init": ["local.hex --force", "deps.get"],
-      "test": ["init", "test"]
     ]
   end
 

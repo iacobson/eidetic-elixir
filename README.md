@@ -6,7 +6,7 @@
 [![Build Status](https://travis-ci.org/GT8Online/eidetic-elixir.svg?branch=master)](https://travis-ci.org/GT8Online/eidetic-elixir)
 [![codecov](https://codecov.io/gh/GT8Online/eidetic-elixir/branch/master/graph/badge.svg)](https://codecov.io/gh/GT8Online/eidetic-elixir)
 
-*WARNING:* This is under active development. Do *NOT* use
+*WARNING:* This is under active development. We do use this in production. API is unlikely to change, but not impossible. 1.0 expected soon
 
 Initial implementation of an event sourced model that can be used in Elixir.
 
@@ -14,6 +14,12 @@ Initial implementation of an event sourced model that can be used in Elixir.
 
 ```elixir
 {:eidetic, "~> 0.2.0"}
+```
+
+## Tests
+
+```shell
+make test
 ```
 
 ## Creating Your First EventSourced Model

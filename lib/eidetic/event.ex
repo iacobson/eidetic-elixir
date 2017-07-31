@@ -5,5 +5,5 @@ defmodule Eidetic.Event do
     version: nil,
     payload: nil,
     metadata: %{},
-    datetime: DateTime.utc_now()
+    datetime: nil
 end

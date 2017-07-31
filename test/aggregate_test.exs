@@ -6,6 +6,7 @@ defmodule Test.Eidetic.Aggregate do
       type: "UserRegistered",
       version: 1,
       serial_number: 1,
+      datetime: DateTime.utc_now(),
       payload: %{
         forename: "Darrell",
         surname: "Abbott"
@@ -15,6 +16,7 @@ defmodule Test.Eidetic.Aggregate do
       type: "UserRenamed",
       version: 1,
       serial_number: 2,
+      datetime: DateTime.utc_now(),
       payload: %{
         forename: "Dimebag",
         surname: "Darrell"
@@ -24,6 +26,7 @@ defmodule Test.Eidetic.Aggregate do
       type: "UserChangedTheirName",
       version: 2,
       serial_number: 1,
+      datetime: DateTime.utc_now(),
       payload: %{
         forename: "Dimebag",
         surname: "Darrell"
@@ -32,11 +35,9 @@ defmodule Test.Eidetic.Aggregate do
   }
 
   test "Can create a new User" do
-    require Logger
-    hje = Example.User.register(forename: "Darrell", surname: "Abbott")
-    Logger.debug(inspect(hje))
+    user = Example.User.register(forename: "Darrell", surname: "Abbott")
 
-    assert %Example.User{forename: "Darrell", surname: "Abbott"} = Example.User.register(forename: "Darrell", surname: "Abbott")
+    assert %Example.User{forename: "Darrell", surname: "Abbott"} = user
   end
 
   test "Can load a user from a single event" do
@@ -71,6 +72,19 @@ defmodule Test.Eidetic.Aggregate do
     assert [uuid: _, binary: _,  type: _, version: 4, variant: _] = aggregate
       |> Example.User.identifier()
       |> UUID.info!
+  end
+
+  test "it handles created_at and last_modified_at dates" do
+    user = Example.User.register(forename: "Darrell", surname: "Abbott")
+
+    assert DateTime.to_unix(DateTime.utc_now()) - DateTime.to_unix(Example.User.created_at(user)) < 1
+
+    # Ensure the renmae event is atleast 1 second after the register
+    :timer.sleep(1000)
+
+    updated_user = Example.User.rename(user, forename: "Dimebag", surname: "Darrell")
+
+    assert DateTime.to_unix(Example.User.created_at(user)) < DateTime.to_unix(Example.User.last_modified_at(updated_user))
   end
 
   test "Will return an updated aggregate and a list of events to be persisted during commit" do

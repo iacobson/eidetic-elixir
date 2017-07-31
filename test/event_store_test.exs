@@ -1,26 +1,16 @@
 defmodule Test.Eidetic.EventStore do
   use ExUnit.Case, async: false
-  require Logger
 
-  test "It can loop uncommitted events and delegate them to the adapter" do
-    {:ok, user} =
-      Example.User.register(forename: "Darrell", surname: "Abbott")
-      |>Eidetic.EventStore.save()
-
-    Logger.debug(inspect(user))
-
-    assert {:ok, user} == Eidetic.EventStore.load(Example.User, user.meta.identifier)
-  end
-
-  test "It can save! and load!" do
+  test "It can save and load aggregates" do
     user =
       [forename: "Darrell", surname: "Abbott"]
       |> Example.User.register()
       |> Eidetic.EventStore.save!()
 
-    Logger.debug(inspect(user))
+    loaded_user = Eidetic.EventStore.load!(Example.User, Example.User.identifier(user))
 
-    assert user == Eidetic.EventStore.load!(Example.User, user.meta.identifier)
+    assert user == loaded_user
+
     assert user.forename == "Darrell"
     assert user.surname == "Abbott"
   end

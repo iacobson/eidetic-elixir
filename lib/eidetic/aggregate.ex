@@ -33,10 +33,13 @@ defmodule Eidetic.Aggregate do
       def load(identifier, events) do
         Logger.debug("Loading #{__MODULE__} with identifier '#{identifier}' and events #{inspect events}")
 
-        aggregate = %__MODULE__{meta: %Eidetic.Meta{identifier: identifier}}
-                    |> initialise(events)
+        aggregate = %__MODULE__{
+          meta: %Eidetic.Meta{
+            identifier: identifier
+          }}
+        |> initialise(events)
 
-        {aggregate, events} = commit(aggregate)
+        {aggregate, _events} = commit(aggregate)
 
         aggregate
       end
@@ -58,6 +61,20 @@ defmodule Eidetic.Aggregate do
       end
 
       @doc """
+      Get the date and time of when this aggregate was created
+      """
+      def created_at(aggregate = %__MODULE__{}) do
+        aggregate.meta.created_at
+      end
+
+      @doc """
+      Get the date and time of when this aggregate was last modified
+      """
+      def last_modified_at(aggregate = %__MODULE__{}) do
+        aggregate.meta.last_modified_at
+      end
+
+      @doc """
       By calling `commit`, you will receive the uncommitted events (to put in your event store)
       and the new aggregate
 
@@ -72,14 +89,13 @@ defmodule Eidetic.Aggregate do
 
         {%{aggregate | meta: Map.put(aggregate.meta, :uncommitted_events, [])}, aggregate.meta.uncommitted_events}
       end
-      @doc false
+
       defp initialise() do
         Logger.debug("Creating a new #{__MODULE__}")
 
         %__MODULE__{}
       end
 
-      @doc false
       defp initialise(aggregate = %__MODULE__{}, [head | tail]) do
         Logger.debug("Rebuilding '#{__MODULE__}' (identifier: '#{identifier(aggregate)}') "
         <> "with events #{inspect [head] ++ tail}")
@@ -89,14 +105,12 @@ defmodule Eidetic.Aggregate do
         |> initialise(tail)
       end
 
-      @doc false
       defp initialise(aggregate = %__MODULE__{}, []) do
         Logger.debug("Completed rebuild of '#{__MODULE__}' (Identifier: '#{identifier(aggregate)}')")
 
         aggregate
       end
 
-      @doc false
       defp initialise(aggregate = %__MODULE__{}, event = %Eidetic.Event{}) do
         Logger.debug("Applying a single event to '#{__MODULE__}' (Identifier: '#{identifier(aggregate)}')"
         <> ". Event is #{inspect event}")
@@ -122,20 +136,30 @@ defmodule Eidetic.Aggregate do
           serial_number: serial_number(aggregate) + 1,
           type: type,
           version: version,
-          payload: payload
+          payload: payload,
+          datetime: DateTime.utc_now()
         }
 
         _apply_event(aggregate, event)
       end
 
-      @doc false
       defp _apply_event(aggregate, events) when is_list(events) do
         Enum.reduce(events, aggregate, fn(event, aggregate) -> _apply_event(event, aggregate) end)
       end
 
-      @doc false
+      defp _apply_event(aggregate = %__MODULE__{meta: %Eidetic.Meta{created_at: nil}}, event = %Eidetic.Event{}) do
+        aggregate
+        |> Map.put(:meta, %{aggregate.meta | created_at: event.datetime})
+        |> _apply_event(event)
+      end
+
       defp _apply_event(aggregate = %__MODULE__{}, event = %Eidetic.Event{}) do
-        aggregate = Map.put(aggregate, :meta, %{aggregate.meta | serial_number: event.serial_number, uncommitted_events: aggregate.meta.uncommitted_events ++ [event]})
+        aggregate = Map.put(aggregate, :meta, %{
+          aggregate.meta |
+            serial_number: event.serial_number,
+            uncommitted_events: aggregate.meta.uncommitted_events ++ [event],
+            last_modified_at: event.datetime
+        })
 
         try do
           apply_event(aggregate, event)
