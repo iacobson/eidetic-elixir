@@ -102,6 +102,10 @@ defmodule Eidetic.EventStore do
     raise "No events loaded"
   end
 
+  defp load_aggregate(type, identifier, []) do
+    raise "No events loaded"
+  end
+
   defp load_aggregate(type, identifier, events) do
     type.load(identifier, events)
   end
