@@ -93,9 +93,17 @@ defmodule Eidetic.EventStore do
   Load events from the EventStore and produce a aggregate, only returning the aggregate.
   """
   def load!(type, identifier) do
-    {:ok, aggregate} = load(type, identifier)
+    {:ok, events} = GenServer.call(:eidetic_eventstore_adapter, {:fetch, identifier})
 
-    aggregate
+    load_aggregate(type, identifier, events)
+  end
+
+  defp load_aggregate(type, identifier, nil) do
+    raise "No events loaded"
+  end
+
+  defp load_aggregate(type, identifier, events) do
+    type.load(identifier, events)
   end
 
   @doc """

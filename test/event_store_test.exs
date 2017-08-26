@@ -15,6 +15,12 @@ defmodule Test.Eidetic.EventStore do
     assert user.surname == "Abbott"
   end
 
+  test "It can raise an error when no events found for Aggregate" do
+    assert_raise RuntimeError, fn ->
+       Eidetic.EventStore.load!(Example.User, "fake-identifier")
+     end
+  end
+
   test "It can add subscribers provided through configuration" do
     Process.register(self(), Example.Subscriber.Config)
 
