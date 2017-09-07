@@ -1,5 +1,9 @@
 defmodule Eidetic.Aggregate do
   require Logger
+  alias Eidetic.Event
+  alias Eidetic.Meta
+
+  # credo:disable-for-this-file Credo.Check.Refactor.LongQuoteBlocks
 
   @moduledoc """
   This module is responsible for initialising new event sourced aggregates,
@@ -25,16 +29,19 @@ defmodule Eidetic.Aggregate do
     quote do
       require Logger
 
-      defstruct unquote(fields) ++ [meta: %Eidetic.Meta{}]
+      defstruct unquote(fields) ++ [meta: %Meta{}]
 
       @doc """
       Load a aggregate by providing the identifier and a list of events to process
       """
       def load(identifier, events) do
-        Logger.debug("Loading #{__MODULE__} with identifier '#{identifier}' and events #{inspect events}")
+        Logger.debug fn ->
+            "Loading #{__MODULE__} with identifier '#{identifier}'"
+              <> " and events #{inspect events}"
+        end
 
         aggregate = %__MODULE__{
-          meta: %Eidetic.Meta{
+          meta: %Meta{
             identifier: identifier
           }}
         |> initialise(events)
@@ -84,21 +91,30 @@ defmodule Eidetic.Aggregate do
       ```
       """
       def commit(aggregate = %__MODULE__{}) do
-        Logger.debug("Committing events for '#{__MODULE__}' (Identifier: '#{aggregate.meta.identifier}'), "
-        <> "with uncommitted events: #{inspect aggregate.meta.uncommitted_events}")
+        Logger.debug fn ->
+          "Committing events for '#{__MODULE__}'"
+            <> " (Identifier: '#{aggregate.meta.identifier}'), "
+            <> "with uncommitted events: "
+            <> "#{inspect aggregate.meta.uncommitted_events}"
+        end
 
-        {%{aggregate | meta: Map.put(aggregate.meta, :uncommitted_events, [])}, aggregate.meta.uncommitted_events}
+        {
+          %{aggregate | meta: Map.put(aggregate.meta, :uncommitted_events, [])},
+          aggregate.meta.uncommitted_events
+        }
       end
 
-      defp initialise() do
-        Logger.debug("Creating a new #{__MODULE__}")
+      defp initialise do
+        Logger.debug fn -> "Creating a new #{__MODULE__}" end
 
         %__MODULE__{}
       end
 
       defp initialise(aggregate = %__MODULE__{}, [head | tail]) do
-        Logger.debug("Rebuilding '#{__MODULE__}' (identifier: '#{identifier(aggregate)}') "
-        <> "with events #{inspect [head] ++ tail}")
+        Logger.debug fn ->
+          "Rebuilding '#{__MODULE__}' (identifier: '#{identifier(aggregate)}') "
+            <> "with events #{inspect [head] ++ tail}"
+      end
 
         aggregate
         |> _apply_event(head)
@@ -106,32 +122,46 @@ defmodule Eidetic.Aggregate do
       end
 
       defp initialise(aggregate = %__MODULE__{}, []) do
-        Logger.debug("Completed rebuild of '#{__MODULE__}' (Identifier: '#{identifier(aggregate)}')")
+        Logger.debug fn ->
+            "Completed rebuild of '#{__MODULE__}' "
+              <> "(Identifier: '#{identifier(aggregate)}')"
+        end
 
         aggregate
       end
 
-      defp initialise(aggregate = %__MODULE__{}, event = %Eidetic.Event{}) do
-        Logger.debug("Applying a single event to '#{__MODULE__}' (Identifier: '#{identifier(aggregate)}')"
-        <> ". Event is #{inspect event}")
+      defp initialise(aggregate = %__MODULE__{}, event = %Event{}) do
+        Logger.debug fn ->
+            "Applying a single event to '#{__MODULE__}' "
+              <> "(Identifier: '#{identifier(aggregate)}')"
+              <> ". Event is #{inspect event}"
+        end
 
         _apply_event(aggregate, event)
       end
 
       @doc false
       defp emit(type: type, version: version, payload: payload) do
-        aggregate = %__MODULE__{meta: %Eidetic.Meta{identifier: UUID.uuid4()}}
+        aggregate = %__MODULE__{meta: %Meta{identifier: UUID.uuid4()}}
 
-        Logger.debug("Event Emitted with no aggregate. Generating '#{__MODULE__}' with identifier '#{identifier(aggregate)}'")
+        Logger.debug fn ->
+            "Event Emitted with no aggregate. Generating '#{__MODULE__}' "
+              <> "with identifier '#{identifier(aggregate)}'"
+        end
 
-        emit aggregate: aggregate, type: type, version: version, payload: payload
+        emit aggregate: aggregate,
+          type: type, version: version, payload: payload
       end
 
       @doc false
       defp emit(aggregate: aggregate = %__MODULE__{}, type: type, version: version, payload: payload) do
-        Logger.debug("Event Emitted from '#{__MODULE__}' (identifier: #{identifier(aggregate)}, type: #{type}, version: #{version}, payload: #{inspect payload})")
+        Logger.debug fn ->
+            "Event Emitted from '#{__MODULE__}' "
+              <> "(identifier: #{identifier(aggregate)}, type: #{type}, "
+              <> "version: #{version}, payload: #{inspect payload})"
+        end
 
-        event = %Eidetic.Event{
+        event = %Event{
           identifier: identifier(aggregate),
           serial_number: serial_number(aggregate) + 1,
           type: type,
@@ -144,16 +174,18 @@ defmodule Eidetic.Aggregate do
       end
 
       defp _apply_event(aggregate, events) when is_list(events) do
-        Enum.reduce(events, aggregate, fn(event, aggregate) -> _apply_event(event, aggregate) end)
+        Enum.reduce(events, aggregate, fn(event, aggregate) ->
+          _apply_event(event, aggregate)
+        end)
       end
 
-      defp _apply_event(aggregate = %__MODULE__{meta: %Eidetic.Meta{created_at: nil}}, event = %Eidetic.Event{}) do
+      defp _apply_event(aggregate = %__MODULE__{meta: %Meta{created_at: nil}}, event = %Event{}) do
         aggregate
         |> Map.put(:meta, %{aggregate.meta | created_at: event.datetime})
         |> _apply_event(event)
       end
 
-      defp _apply_event(aggregate = %__MODULE__{}, event = %Eidetic.Event{}) do
+      defp _apply_event(aggregate = %__MODULE__{}, event = %Event{}) do
         aggregate = Map.put(aggregate, :meta, %{
           aggregate.meta |
             serial_number: event.serial_number,
@@ -164,7 +196,9 @@ defmodule Eidetic.Aggregate do
         try do
           apply_event(aggregate, event)
         rescue
-            error -> raise RuntimeError, message: "Unsupported event: #{event.type}, version #{event.version}"
+            error -> reraise RuntimeError,
+              "Unsupported event: #{event.type}, version #{event.version}",
+              System.stacktrace()
         end
 
       end

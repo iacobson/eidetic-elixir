@@ -12,17 +12,24 @@ defmodule Eidetic.EventStore.GenServer do
 
   @doc false
   def handle_call({:record, event = %Eidetic.Event{}}, _from, state) do
-    Logger.debug("Updating state #{inspect state} with #{inspect event}")
+    Logger.debug fn ->
+        "Updating state #{inspect state} with #{inspect event}"
+    end
+
     {:reply,
-      [object_identifier: event.identifier <> ":" <> Integer.to_string(event.serial_number)],
+      [object_identifier: event.identifier
+        <> ":" <> Integer.to_string(event.serial_number)
+      ],
       Map.update(state, event.identifier, [event], &(&1 ++ [event]))
     }
   end
 
   @doc false
   def handle_call({:fetch, identifier}, _from, state) do
-    Logger.debug("Looking for #{identifier} in state #{inspect state}")
+    Logger.debug fn ->
+      "Looking for #{identifier} in state #{inspect state}"
+    end
+
     {:reply, {:ok, Map.get(state, identifier, nil)}, state}
   end
 end
-

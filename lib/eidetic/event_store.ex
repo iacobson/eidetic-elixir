@@ -13,60 +13,50 @@ defmodule Eidetic.EventStore do
   ```elixir
   {:ok, aggregate} = Eidetic.save(an_aggregate)
 
-  aggregate =
-    aggregate
-    |> Eidetic.save!()
+  # or
+  aggregate = Eidetic.save!(aggregate)
   ```
   """
 
-  @callback handle_call({:record, %Eidetic.Event{}}, pid, Map) :: {:ok, [object_identifier: String.t]}
-  @callback handle_call({:fetch, String.t}, pid, Map) :: {:ok, [events: [%Eidetic.Event{}]]}
-
-  use Supervisor
+  use GenServer
+  alias Eidetic.Aggregate
+  alias Eidetic.Event
   require Logger
 
-  @doc false
-  def start_link do
-    Logger.debug("Starting Agent for Subscribers")
-    Agent.start_link(fn -> MapSet.new end, name: :eidetic_eventstore_pubsub)
-    Enum.each(Application.get_env(:eidetic, :eventstore_subscribers), fn(subscriber) ->
-      Logger.debug("Subscriber found in configuration. Adding #{subscriber}")
-      add_subscriber(subscriber)
-    end)
+  @callback handle_call({:record, %Event{}}, pid, Map)
+    :: {:ok, [object_identifier: String.t]}
 
-    Logger.debug("Starting with adapter: #{inspect Application.get_env(:eidetic, :eventstore_adapter)}")
-    Supervisor.start_link(__MODULE__, [])
+  @callback handle_call({:fetch, String.t}, pid, Map)
+    :: {:ok, [events: [%Event{}]]}
+
+  @spec save(map())
+    :: {:ok, map()}
+  @spec save!(map())
+    :: map()
+
+  @spec load(atom(), binary())
+    :: {:ok, map()}
+  @spec load!(atom(), binary())
+    :: map()
+
+  @spec add_subscriber(atom())
+    :: any()
+
+  @doc false
+  def start_link(state = %{adapter: adapter, subscribers: subscribers}) do
+    GenServer.start_link(__MODULE__, state, [name: :eidetic_eventstore])
   end
 
   @doc false
-  def init([]) do
-    children = [
-      worker(Application.get_env(:eidetic, :eventstore_adapter),[[name: :eidetic_eventstore_adapter]])
-    ]
-
-    supervise(children, strategy: :one_for_one)
+  def init(state = %{adapter: adapter, subscribers: subscribers}) do
+    {:ok, state}
   end
 
   @doc """
   Save an %Eidetic.Aggregate{}'s uncommitted events to the EventStore
   """
   def save(aggregate) do
-    # GenServer.cast(:eventstore_adapter, {:start_transaction})
-    for event <- aggregate.meta.uncommitted_events do
-      GenServer.call(:eidetic_eventstore_adapter, {:record, event})
-    end
-    # :ok = GenServer.cast(:eventstore_adapter, {:end_transaction})
-
-    # Transaction didn't fail, publish
-    for event <- aggregate.meta.uncommitted_events do
-      Enum.each(Agent.get(:eidetic_eventstore_pubsub, fn subscribers -> subscribers end),
-        fn(subscriber) ->
-          Logger.debug("Publishing to subscriber #{inspect subscriber}")
-          GenServer.cast(subscriber, {:publish, event})
-      end)
-    end
-
-    {:ok, %{aggregate | meta: Map.put(aggregate.meta, :uncommitted_events, [])}}
+    GenServer.call(:eidetic_eventstore, {:save, aggregate})
   end
 
   @doc """
@@ -80,41 +70,72 @@ defmodule Eidetic.EventStore do
     aggregate
   end
 
+  def handle_call({:save, aggregate}, _from, state = %{subscribers: subscribers}) do
+    # GenServer.cast(:eventstore_adapter, {:start_transaction})
+    for event <- aggregate.meta.uncommitted_events do
+      GenServer.call(:eidetic_eventstore_adapter, {:record, event})
+    end
+    # :ok = GenServer.cast(:eventstore_adapter, {:end_transaction})
+
+    # Transaction didn't fail, publish
+    for event <- aggregate.meta.uncommitted_events do
+      for subscriber <- subscribers do
+          Logger.debug fn ->
+              "Publishing to subscriber #{inspect subscriber}"
+          end
+          GenServer.cast(subscriber, {:publish, event})
+      end
+    end
+
+    {:reply,
+      {
+        :ok,
+        %{aggregate | meta: Map.put(aggregate.meta, :uncommitted_events, [])}
+      },
+      state}
+  end
+
   @doc """
   Load events from the EventStore and produce a aggregate
   """
   def load(type, identifier) do
-    Logger.debug("I have #{type}")
-    {:ok, events} = GenServer.call(:eidetic_eventstore_adapter, {:fetch, identifier})
-    {:ok, type.load(identifier, events)}
+    GenServer.call(:eidetic_eventstore, {:load, type, identifier})
   end
 
   @doc """
   Load events from the EventStore and produce a aggregate, only returning the aggregate.
   """
   def load!(type, identifier) do
-    {:ok, events} = GenServer.call(:eidetic_eventstore_adapter, {:fetch, identifier})
+    {:ok, aggregate = %type{}} = load(type, identifier)
 
-    load_aggregate(type, identifier, events)
+    aggregate
+
+  rescue
+    error in MatchError
+      -> reraise RuntimeError, ~s/Could not find an aggregate with identifier
+        "#{identifier}" and type #{type}/, System.stacktrace()
+
+    error
+      -> reraise ~s/Unexpected error loading aggregate: #{inspect error}/,
+        System.stacktrace()
   end
 
-  defp load_aggregate(type, identifier, nil) do
-    raise "No events loaded"
+  def handle_call({:load, type, identifier}, _from, state) do
+    with {:ok, events} when is_list(events)
+      <- GenServer.call(:eidetic_eventstore_adapter, {:fetch, identifier})
+    do
+      {:reply, {:ok, type.load(identifier, events)}, state}
+    else
+      _
+        -> {:reply, :aggregate_does_not_exist, state}
+    end
   end
 
-  defp load_aggregate(type, identifier, []) do
-    raise "No events loaded"
-  end
-
-  defp load_aggregate(type, identifier, events) do
-    type.load(identifier, events)
-  end
-
-  @doc """
-  Add a subscriber so that they receive notifications whenever an event is
-  written to the EventStore
-  """
   def add_subscriber(subscriber) do
-    Agent.update(:eidetic_eventstore_pubsub, &MapSet.put(&1, subscriber))
+    GenServer.cast(:eidetic_eventstore, {:add_subscriber, subscriber})
+  end
+
+  def handle_cast({:add_subscriber, subscriber}, state = %{subscribers: subscribers}) do
+    {:noreply, %{subscribers: subscribers ++ [subscriber]}}
   end
 end

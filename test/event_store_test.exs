@@ -15,8 +15,10 @@ defmodule Test.Eidetic.EventStore do
     assert user.surname == "Abbott"
   end
 
-  test "It can raise an error when no events found for Aggregate" do
-    assert_raise RuntimeError, fn ->
+  test "it can handle aggregates that do no exist" do
+    assert :aggregate_does_not_exist = Eidetic.EventStore.load(Example.User, "fake-identifier")
+
+    assert_raise RuntimeError,  ~r/^Could not find/, fn ->
        Eidetic.EventStore.load!(Example.User, "fake-identifier")
      end
   end

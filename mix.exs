@@ -19,13 +19,13 @@ defmodule Eidetic.Mixfile do
   def application do
     [ applications: [
       :logger
-    ]
-  ]
+    ]]
   end
 
   def deps do
     [{:uuid, "~> 1.1"},
 
+     {:credo, ">= 0.0.0", only: [:dev, :test]},
      {:ex_doc, ">= 0.0.0", only: :dev},
      {:excoveralls, "~> 0.6", only: :test}
     ]
