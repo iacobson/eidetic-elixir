@@ -32,4 +32,21 @@ defmodule Eidetic.EventStore.GenServer do
 
     {:reply, {:ok, Map.get(state, identifier, nil)}, state}
   end
+
+  @doc false
+  def handle_call({:fetch_until, identifier, version}, _from, state) do
+    Logger.debug fn ->
+      "Looking for #{identifier} in state #{inspect state}, until version #{version}"
+    end
+
+    events = state
+    |> Map.get(identifier, nil)
+    |> Enum.filter(fn(event) ->
+      version >= event.serial_number
+    end)
+
+    Logger.debug fn() -> "Returning events #{inspect events}" end
+
+    {:reply, {:ok, events}, state}
+  end
 end

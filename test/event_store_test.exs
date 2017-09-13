@@ -15,6 +15,24 @@ defmodule Test.Eidetic.EventStore do
     assert user.surname == "Abbott"
   end
 
+  test "It can load an aggregate to a particular version" do
+    user =
+      [forename: "Darrell", surname: "Abbott"]
+      |> Example.User.register()
+      |> Example.User.rename(forename: "Dimebag", surname: "Darrell")
+      |> Eidetic.EventStore.save!()
+
+    loaded_user = Eidetic.EventStore.load!(Example.User, Example.User.identifier(user), version: 1)
+
+    assert loaded_user.forename == "Darrell"
+    assert loaded_user.surname == "Abbott"
+
+    loaded_user = Eidetic.EventStore.load!(Example.User, Example.User.identifier(user), version: 2)
+
+    assert user.forename == "Dimebag"
+    assert user.surname == "Darrell"
+  end
+
   test "it can handle aggregates that do no exist" do
     assert :aggregate_does_not_exist = Eidetic.EventStore.load(Example.User, "fake-identifier")
 

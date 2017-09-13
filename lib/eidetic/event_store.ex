@@ -29,6 +29,9 @@ defmodule Eidetic.EventStore do
   @callback handle_call({:fetch, String.t}, pid, Map)
     :: {:ok, [events: [%Event{}]]}
 
+  @callback handle_call({:fetch_until, String.t, pos_integer()}, pid, Map)
+    :: {:ok, [events: [%Event{}]]}
+
   @spec save(map())
     :: {:ok, map()}
   @spec save!(map())
@@ -96,10 +99,17 @@ defmodule Eidetic.EventStore do
   end
 
   @doc """
-  Load events from the EventStore and produce a aggregate
+  Load events from the EventStore and produce an aggregate
   """
   def load(type, identifier) do
     GenServer.call(:eidetic_eventstore, {:load, type, identifier})
+  end
+
+  @doc """
+  Load events, to a particular version, from the EventStore and produce an aggregate
+  """
+  def load(type, identifier, [version: version]) do
+    GenServer.call(:eidetic_eventstore, {:load, type, identifier, version})
   end
 
   @doc """
@@ -120,9 +130,39 @@ defmodule Eidetic.EventStore do
         System.stacktrace()
   end
 
+  @doc """
+  Load events, to a particular version, from the EventStore and produce a
+    aggregate, only returning the aggregate.
+  """
+  def load!(type, identifier, [version: version]) do
+    {:ok, aggregate = %type{}} = load(type, identifier, [version: version])
+
+    aggregate
+
+  rescue
+    error in MatchError
+      -> reraise RuntimeError, ~s/Could not find an aggregate with identifier
+        "#{identifier}" and type #{type}/, System.stacktrace()
+
+    error
+      -> reraise ~s/Unexpected error loading aggregate: #{inspect error}/,
+        System.stacktrace()
+  end
+
   def handle_call({:load, type, identifier}, _from, state) do
     with {:ok, events} when is_list(events)
       <- GenServer.call(:eidetic_eventstore_adapter, {:fetch, identifier})
+    do
+      {:reply, {:ok, type.load(identifier, events)}, state}
+    else
+      _
+        -> {:reply, :aggregate_does_not_exist, state}
+    end
+  end
+
+  def handle_call({:load, type, identifier, version}, _from, state) do
+    with {:ok, events} when is_list(events)
+      <- GenServer.call(:eidetic_eventstore_adapter, {:fetch_until, identifier, version})
     do
       {:reply, {:ok, type.load(identifier, events)}, state}
     else
