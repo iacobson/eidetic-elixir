@@ -162,7 +162,8 @@ defmodule Eidetic.EventStore do
 
   def handle_call({:load, type, identifier, version}, _from, state) do
     with {:ok, events} when is_list(events)
-      <- GenServer.call(:eidetic_eventstore_adapter, {:fetch_until, identifier, version})
+      <- GenServer.call(:eidetic_eventstore_adapter, {:fetch_until, identifier,
+          version})
     do
       {:reply, {:ok, type.load(identifier, events)}, state}
     else

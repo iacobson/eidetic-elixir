@@ -1,10 +1,13 @@
 # Eidetic (EventSourcing for Elixir)
 
+**Note:** The canonical repository is hosted [here](https://gitlab.com/gt8/open-source/elixir/eidetic), on GitLab.com.
+
 [![Hex.pm](https://img.shields.io/hexpm/v/eidetic.svg)](https://hex.pm/packages/eidetic)
 [![Hex.pm](https://img.shields.io/hexpm/l/eidetic.svg)](https://hex.pm/packages/eidetic)
 [![Hex.pm](https://img.shields.io/hexpm/dw/eidetic.svg)](https://hex.pm/packages/eidetic)
-[![Build Status](https://travis-ci.org/GT8Online/eidetic-elixir.svg?branch=master)](https://travis-ci.org/GT8Online/eidetic-elixir)
-[![codecov](https://codecov.io/gh/GT8Online/eidetic-elixir/branch/master/graph/badge.svg)](https://codecov.io/gh/GT8Online/eidetic-elixir)
+[![build status](https://gitlab.com/gt8/open-source/elixir/eidetic/badges/master/pipeline.svg)](https://gitlab.com/gt8/open-source/elixir/eidetic/commits/master)
+[![code coverage](https://gitlab.com/gt8/open-source/elixir/eidetic/badges/master/coverage.svg)](https://gitlab.com/gt8/open-source/elixir/eidetic/commits/master)
+
 
 *WARNING:* This is under active development. We do use this in production. API is unlikely to change, but not impossible. 1.0 expected soon
 
