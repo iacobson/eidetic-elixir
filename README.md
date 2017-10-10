@@ -16,7 +16,7 @@ Initial implementation of an event sourced model that can be used in Elixir.
 ## Installing
 
 ```elixir
-{:eidetic, "~> 0.4.0"}
+{:eidetic, "~> 0.5.0"}
 ```
 
 ## Tests
