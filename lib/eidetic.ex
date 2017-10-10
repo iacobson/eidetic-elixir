@@ -40,11 +40,9 @@ defmodule Eidetic do
     children = [
       worker(Eidetic.EventStore, [state]),
       worker(adapter, [[name: :eidetic_eventstore_adapter]])
-    ]
-
-    for subscriber <- subscribers do
-        children = [worker(subscriber, [])] ++ children
-    end
+    ] ++ Enum.map(subscribers, fn(subscriber) ->
+      worker(subscriber, [name: subscriber])
+    end)
 
     supervise(children, strategy: :one_for_one)
   end
